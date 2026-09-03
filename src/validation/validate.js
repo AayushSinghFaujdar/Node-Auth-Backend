@@ -81,8 +81,10 @@ const getTransport = () => {
     if (transport) return transport;
     transport = createTransport({
         host: process.env.SMTP_HOST,
-        port: 465,
-        secure: true,
+        port: 587,
+        secure: false,
+        requireTLS: true,
+        family: 4,
         auth: {
             user: process.env.GMAIL_MAIL,
             pass: process.env.GMAIL_PASS
