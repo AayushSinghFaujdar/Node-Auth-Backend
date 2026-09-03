@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { generate } from "otp-generator";
 import { Users } from "../Storage.js";
-import { createTransport } from "nodemailer";
+import { Resend } from "resend";
 import jwt from 'jsonwebtoken';
 
 const OTP_TTL_MS = 5 * 60 * 1000;   // OTP is valid for 5 minutes
@@ -71,39 +71,16 @@ export const isUser = ({ mail, pass }) => {
     }
 }
 
-/* SMTP with hard timeouts. Without these, a blocked port 465 (very common on
- * college / office / hostel / some ISP networks) leaves nodemailer waiting for
- * minutes and the register request hangs — same "no response" symptom, different
- * cause. Built lazily: ESM `import` statements are hoisted, so this module runs
- * BEFORE dotenv.config() in index.js and process.env is still empty up here. */
-let transport = null;
-const getTransport = () => {
-    if (transport) return transport;
-    transport = createTransport({
-        host: process.env.SMTP_HOST,
-        port: 587,
-        secure: false,
-        requireTLS: true,
-        family: 4,
-        auth: {
-            user: process.env.GMAIL_MAIL,
-            pass: process.env.GMAIL_PASS
-        },
-        connectionTimeout: 60000,
-        greetingTimeout: 60000,
-        socketTimeout: 60000
-    });
-    return transport;
-};
-
-const mail = ({ mail, otp }) => {
-    if (!process.env.GMAIL_MAIL || !process.env.GMAIL_PASS) {
-        throw new Error("GMAIL_MAIL / GMAIL_PASS missing from .env");
+const mail = async ({ mail, otp }) => {
+    if (!process.env.RESEND_API_KEY) {
+        throw new Error("RESEND_API_KEY missing from environment");
     }
-    return getTransport().sendMail({
-        from: process.env.GMAIL_MAIL,
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const { error } = await resend.emails.send({
+        from: 'onboarding@resend.dev',
         to: mail,
-        subject: "registration OTP",
-        text: `YOUR USER REGISTRATION OTP IS: \n${otp}`
+        subject: 'Registration OTP',
+        text: `Your registration OTP is: ${otp}\n\nValid for 5 minutes.`
     });
+    if (error) throw new Error(error.message);
 };
